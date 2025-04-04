@@ -1,0 +1,165 @@
+import pygame
+import random
+
+# Initialize pygame
+pygame.init()
+pygame.mixer.init()  # Initialize the mixer for sound effects
+
+# Constants
+WIDTH, HEIGHT = 800, 600
+PLAYER_SPEED = 5
+BULLET_SPEED = 7
+PARATROOPER_SPEED = 2
+PARATROOPER_SPAWN_RATE = 30
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+PINK = (255, 192, 203)
+RED = (255, 0, 0)
+
+# Setup display
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Paratrooper Game")
+clock = pygame.time.Clock()
+
+# Load assets
+player_img = pygame.image.load("player.png")
+paratrooper_img = pygame.image.load("paratrooper.png")
+landed_paratrooper_img = pygame.image.load("landedparatrooper.png")
+bullet_img = pygame.image.load("bullet.png")
+
+# Load sounds
+shoot_sound = pygame.mixer.Sound("shoot.mp3")  # Sound for shooting bullets
+hit_sound = pygame.mixer.Sound("hit.mp3")  # Sound for hitting paratrooper
+
+# Classes
+class Player:
+    def __init__(self):
+        self.x = WIDTH // 2
+        self.y = HEIGHT - 50
+        self.width = 50
+        self.height = 50
+    
+    def move(self, direction):
+        if direction == "left" and self.x > 0:
+            self.x -= PLAYER_SPEED
+        if direction == "right" and self.x < WIDTH - self.width:
+            self.x += PLAYER_SPEED
+    
+    def draw(self):
+        screen.blit(player_img, (self.x, self.y))
+
+class Bullet:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 10
+        self.height = 20
+
+    def move(self):
+        self.y -= BULLET_SPEED
+    
+    def draw(self):
+        screen.blit(bullet_img, (self.x, self.y))
+
+class Paratrooper:
+    def __init__(self):
+        self.x = random.randint(0, WIDTH - 50)
+        self.y = 0
+        self.width = 40
+        self.height = 40
+        self.landed = 0
+    
+    def move(self):
+        self.y += PARATROOPER_SPEED
+    
+    def draw(self):
+        if (self.landed == 0):
+            screen.blit(paratrooper_img, (self.x, self.y))
+        else:
+            screen.blit(landed_paratrooper_img, (self.x, self.y))
+
+def check_collision(bullet, paratrooper):
+    """Check if a bullet hits a paratrooper."""
+    if (bullet.x < paratrooper.x + paratrooper.width and
+        bullet.x + bullet.width > paratrooper.x and
+        bullet.y < paratrooper.y + paratrooper.height and
+        bullet.y + bullet.height > paratrooper.y):
+        return True
+    return False
+
+# Game loop
+player = Player()
+bullets = []
+paratroopers = []
+landed_paratroopers = 0  # Count how many paratroopers have landed
+running = True
+frame_count = 0
+
+while running:
+    # Set background color based on the number of landed paratroopers
+    if landed_paratroopers > 10:
+        screen.fill(RED)
+        font = pygame.font.SysFont(None, 75)
+        text = font.render("GAME OVER", True, WHITE)
+        screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT // 2))
+        pygame.display.flip()
+        pygame.time.delay(5000)  # Show the game over message for 2 seconds
+        running = False  # End the game
+    elif landed_paratroopers > 5:
+        screen.fill(PINK)
+    else:
+        screen.fill(BLACK)
+
+    # Event handling
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+    
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT]:
+        player.move("left")
+    if keys[pygame.K_RIGHT]:
+        player.move("right")
+    if keys[pygame.K_SPACE]:
+        bullets.append(Bullet(player.x + 20, player.y))
+        shoot_sound.play()  # Play the shoot sound when firing a bullet
+    
+    # Update objects
+    for bullet in bullets[:]:
+        bullet.move()
+        for para in paratroopers[:]:
+            if check_collision(bullet, para):
+                # Collision detected, remove bullet and paratrooper
+                bullets.remove(bullet)
+                paratroopers.remove(para)
+                hit_sound.play()  # Play the hit sound when a bullet hits a paratrooper
+                break  # No need to check further paratroopers for this bullet
+
+    bullets = [b for b in bullets if b.y > 0]  # Remove bullets that went off-screen
+    if frame_count % PARATROOPER_SPAWN_RATE == 0:
+        paratroopers.append(Paratrooper())
+    
+    for para in paratroopers[:]:
+        if (para.landed == 0):
+            para.move()
+        if para.y >= HEIGHT - para.height -50 and para.landed == 0:  # Paratrooper has landed
+            landed_paratroopers += 1
+            para.landed = 1
+            
+    
+    #paratroopers = [p for p in paratroopers if p.y < HEIGHT]  # Remove paratroopers that fall off-screen
+    
+    # Draw objects
+    player.draw()
+    for bullet in bullets:
+        bullet.draw()
+    for para in paratroopers:
+        para.draw()
+    
+    pygame.display.flip()
+    clock.tick(30)
+    frame_count += 1
+
+pygame.quit()
